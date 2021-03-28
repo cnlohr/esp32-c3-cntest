@@ -33,10 +33,25 @@ riscv32-esp-elf-objdump -b binary --adjust-vma=0x40000000  esp32_c3_romdump.bin 
 
 Find your function in esp32c3.rom.ld and follow it around.
 
+## I2S Engine
+
+The I2S engine in the C3 looks to be much more robust than in previous chips.  I still can't get WSCLK working right, but the raw performance with the GDMA engine is spectacular.
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## TODO
- * Play with BBPLL to see if we can up the main clock frequency.  Look up `rtc_clk_cpu_freq_mhz_to_config`
-
+ * Play with BBPLL to see if we can up the main clock frequency --> YES! It's very similar to the 8266.
+ * Look into `esp32c3/rtc_clk.c` and up `rtc_clk_cpu_freq_mhz_to_config`
 
 ## Process for figuring out I2C and APLL
 
@@ -154,3 +169,4 @@ It's 7:21 AM now, I found out that when you mess with the BBPLL (0x03->0x0c), it
 Rifling around in the DIG and on the unknown device 0x67 as well as the SAR ADC has yielded nothing.
 
 8 AM now... Still no sign of the APLL.
+
