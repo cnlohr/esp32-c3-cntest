@@ -149,12 +149,14 @@
 //#define I2C_APLL            0X6D
 //#define I2C_APLL_HOSTID     1
 
-
+//I don't think this is the APLL.
 #define I2C_APLL            0x6D
-#define I2C_APLL_HOSTID     1
+#define I2C_APLL_HOSTID     0
 
 void rtc_clk_apll_enable(bool enable, uint32_t sdm0, uint32_t sdm1, uint32_t sdm2, uint32_t o_div)
 {
+	//XXX DOES NOT WORK!
+
 	int i; i = 0;
 //    REG_SET_FIELD(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_PLLA_FORCE_PD, enable ? 0 : 1);
 //    REG_SET_FIELD(RTC_CNTL_ANA_CONF_REG, RTC_CNTL_PLLA_FORCE_PU, enable ? 1 : 0);
@@ -171,8 +173,6 @@ void rtc_clk_apll_enable(bool enable, uint32_t sdm0, uint32_t sdm1, uint32_t sdm
 	}
 #endif
 
-        REGI2C_WRITE(I2C_APLL, 0x04, 0x96);
-
         REGI2C_WRITE(I2C_APLL, I2C_APLL_SDM_STOP, APLL_SDM_STOP_VAL_1);
         REGI2C_WRITE(I2C_APLL, I2C_APLL_SDM_STOP, APLL_SDM_STOP_VAL_2_REV1);
 
@@ -181,7 +181,6 @@ void rtc_clk_apll_enable(bool enable, uint32_t sdm0, uint32_t sdm1, uint32_t sdm
         REGI2C_WRITE(I2C_APLL, I2C_APLL_IR_CAL_DELAY, APLL_CAL_DELAY_3);
 
 #if 1
-
 	for( i = 0; i < 32; i++ )
 	{
 		printf( "%02x: %02x\n", i,rom_i2c_readReg( I2C_APLL, I2C_APLL_HOSTID, i ) ); 
@@ -384,6 +383,42 @@ void app_main(void)
 	//Does this work? ... NO ... It causes the chip to crash.
 	//rtc_clk_apll_enable(1, 0, 0, 8, 0);
 
+	int dev;
+	int hid;
+	for( hid = 0; hid < 2; hid++ )
+	for( dev = 0x60; dev < 0x6f; dev++ )
+	{
+		printf( "%02x/%d: ", dev, hid );
+		for( i = 0; i < 32; i++ )
+		{
+			printf( "%02x ", rom_i2c_readReg( dev, hid, i )); 
+		}
+		printf( "\n" );
+	}
+
+	//0x66, 0x00, 0x03, 0x09 controls system clock frequency. (upping it a little)
+	//            0x04, 0x5c controls frequency (divides by half) 0x8c goes down to 16 MHz.  controls some big divisor. 0xff = 83.24x2?!?!
+	//rom_i2c_writeReg( 0x66, 0x00, 0x03, 0x09 );
+
+	//Back to BBPLL
+	//66/0: 18 25 50 08 6b 80 93 00 c1 92 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  BBPLL
+	//address 0x01 affects apll but only makes it slower (top nibble)
+	//address 0x02 affects apll too.  These may also be affecting system frequency. (only lowers)
+	//NOTE: When running the chip at 0x03=0x0c, APLL goes to 320 MHz.
+	//rom_i2c_writeReg( 0x66, 0x00, 0x03, 0x0a );
+//	rtc_clk_apb_freq_update( 30000000 );
+//    rtc_clk_fast_freq_set( 26000000 );
+
+	// TODO Look into this
+	/*
+	rtc_cpu_freq_config_t cfg;
+    bool res = rtc_clk_cpu_freq_mhz_to_config(160, &cfg);
+    if (!res) {
+        SOC_LOGE(TAG, "invalid CPU frequency value");
+        abort();
+    }
+    rtc_clk_cpu_freq_set_config(&cfg);
+*/
 
 	printf( "3======================\n" );
 

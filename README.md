@@ -77,7 +77,7 @@ This describes a process which took place sfrom Sat Mar 27, 2021 at ~4:00 PM to 
 //6a 00000077 00000077 00000077 BIAS
 //6b 00000000 00000000 00000000  ?
 //6c 000000ff 000000ff 000000ff 
-//6d 000000f0 000000f0 000000f0 Possibly APLL
+//6d 000000f0 000000f0 000000f0 Possibly APLL (Though probably not after more tests)
 ```
  * Looks like it might be the APLL
  * Dump registers on APLL.  Note comments are from ESP32, these may be all bogus.
@@ -99,6 +99,26 @@ This describes a process which took place sfrom Sat Mar 27, 2021 at ~4:00 PM to 
 	0e: 00000080
 	0f: 00000000
 ```
+
+Here is a dump of the I2C device's internal registers:
+```
+60/0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 
+61/0: 1f 02 08 49 51 07 80 0f 13 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  BoD
+62/0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+63/0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+64/0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+65/0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+66/0: 18 25 50 08 6b 80 93 00 c1 92 03 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  BBPLL
+67/0: 00 00 2a f4 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10 10 1e 1e 1e 1e 1e 1e 1e 1e 1e 1e 1e 1e  ????
+68/0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 
+69/0: 00 60 11 00 60 11 2f 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  SAR ADC
+6a/0: 77 77 58 82 1c 1e 10 73 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  BIAS
+6b/0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+6c/0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 
+6d/0: f0 04 80 04 97 17 9c 18 1f 0f 00 04 16 42 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  Possibly APLL  (Though probably not after more tests)  --> EDIT --> NO! Totally not APLL. It's the DIG.
+6e/0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 
+```
+
  *  = fXtal * (24 + 31/256 + 15/65536 + 4 ) / 18 => fXTal = 153.62MHz? --- This APLL is different :(
  * Ok, looks like the APLL is in use.  Don't mess with it.
  * Try configuring MCLK on I2S to APLL
@@ -115,6 +135,22 @@ OK GIVE UP ON APLL.
  * Get BCLK up.
  * It's really useful to force the clocks on to experiment.  Also TDM mode seems to make clock more when things are janky.
  * Rifle around til 6:06 AM.
- * Get it working at 120 Mbauds.
+ * Get it working at 120 Mbauds with apll
 
 
+## Messing with the BBPLL
+
+```
+	rom_i2c_writeReg( 0x66, 0x00, 0x03, 0x09 ); //Sets system clock to 173.36 MHz.
+```
+
+Tested with my part, when in 160 MHz mode, 0x0c (213.4 MHz) is janky.  0x0d and 0x0b don't work. But 0x0a (186.6 MHz is great).
+
+The next byte, 0x04 does seem to have some sort of other division effect.  Also, 0x02 as well.
+
+
+It's 7:21 AM now, I found out that when you mess with the BBPLL (0x03->0x0c), it also affects the APLL, so I can test the APLL at 320MHz and it works.  (The system is still janky)
+
+Rifling around in the DIG and on the unknown device 0x67 as well as the SAR ADC has yielded nothing.
+
+8 AM now... Still no sign of the APLL.
