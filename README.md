@@ -18,6 +18,7 @@
 ## I2S General observations:
 	* When setting I2S to APLL it automatically operates at 240MHz.  You must /2 for BCK.  But that is, stock, 120 MHz output clock.
 	* APLL Seems tied to BBPLL.  But BBPLL can't overclock too hard.  Part becomes flakey at 220/240 MHz.
+	* I could only get TDM mode working, and only then without a properly formed WS line.  So it's good for fun stuff, not for real TDM.
 
 
 
