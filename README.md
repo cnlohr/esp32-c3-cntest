@@ -15,6 +15,12 @@
 	* W1TS and W1TC are the same as OUT.
 	* See gpio_struct.h for the actual structure.
 
+## I2S General observations:
+	* When setting I2S to APLL it automatically operates at 240MHz.  You must /2 for BCK.  But that is, stock, 120 MHz output clock.
+	* APLL Seems tied to BBPLL.  But BBPLL can't overclock too hard.  Part becomes flakey at 220/240 MHz.
+
+
+
 ## Get an assembly listing of your program.
 
 Ideally you write some stub function to do what you want to do roughly, then run this, then write your own function to replace it in assembly.
