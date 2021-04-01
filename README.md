@@ -59,17 +59,7 @@ So, figured it out.
 
 This slowness is unfortunate but understandable.  It also includes the time spent to increment the stack pointer, save off some registers, setup the regisers for GPIO output and output.
 
-
-### TODO Interrupts
-
-Can we weakly tie all of the interrupts to unique handlers then allow users to override if they want?
-
-
-
-
-
-
-
+OKK I have a PR in with espressif.  Using this you can look at an example where we replace the interrupt vector completely (and can have arbitrary code there) in the gpio example in this tree. https://github.com/espressif/esp-idf/pull/6808
 
 
 ## TODO
