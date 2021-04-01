@@ -19,9 +19,22 @@
 //This is the magic file.
 #include "soc/gpio_struct.h"
 
+void IRAM_ATTR gpio_test_interrupt( void * attr )
+{
+	GPIO.out.val = 1<<3;
+	GPIO.status_w1tc.val = 0xffffffff;
+}
+
+void IRAM_ATTR asm_isr_handler( void * attr );
+
 void app_main(void)
 {
     printf("Hello world!\n");
+
+
+	extern int _custom_vector_table;
+	cpu_hal_set_vecbase(&_custom_vector_table);
+
 
     /* Print chip information */
     esp_chip_info_t chip_info;
@@ -39,14 +52,34 @@ void app_main(void)
 
     printf("Minimum free heap size: %d bytes\n", esp_get_minimum_free_heap_size());
 
-
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = 1<<0;
+    io_conf.pin_bit_mask = ( 1<<0 ) | ( 1<<1 ) | ( 1<<2 ) | ( 1<<3 ) | ( 1<<4 ) | (1<<5) | ( 1<<6 );
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
+
+
+	//Interrupt test assumes GPIO6 and 7 are tied together.
+	//Alternative way to configure GPIOs
+
+    gpio_pad_select_gpio(GPIO_NUM_7);
+    gpio_set_direction(GPIO_NUM_7, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(GPIO_NUM_7, GPIO_PULLUP_ONLY);
+    gpio_set_intr_type(GPIO_NUM_7, GPIO_INTR_POSEDGE);
+    gpio_intr_enable(GPIO_NUM_7);
+
+// Fast path (920ns)
+    gpio_isr_register( asm_isr_handler, 0, ESP_INTR_FLAG_FIXED | (31<<ESP_INTR_FLAG_FIXED_OFF_S), 0 );
+// Slow path (1350ns)
+//    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+//    gpio_isr_handler_add(GPIO_NUM_7, gpio_test_interrupt, 0);
+
+//Not sure where the NMI is connected.
+//	GPIO.pcpu_nmi_int.val = (1<<7);
+//	GPIO.pcpu_int.val = (1<<7);
+
 
 
 	//hw->out_w1ts.out_w1ts
@@ -68,6 +101,13 @@ void app_main(void)
 			* It appears using data immediately after read incurs a one 80 MHz cycle penalty.
 	*/
 
+	//Technique: Use a logic analyzer or oscilloscope on GPIO0 and count cycles.
+
+	//Just FYI USB is 13.33x 160MHz Clock Ticks.
+	//GPIO Input takes 6 clock cycles.
+	//That means we have 7.3333 clock cycles to figure out what to do.
+
+	printf( "Entering main loop\n" );
 	while(1)
 	{
 		asm volatile( "nop\nnop\nnop\nnop" );
@@ -77,10 +117,9 @@ void app_main(void)
 		asm volatile( "nop\nnop\nnop\nnop" );
 		asm volatile( "nop\nnop\nnop\nnop" );
 		*odr = 1;
-		asm volatile( "nop" );
 		*odr = 0;
-#if 0
-		*odr = *readval;
+		*odr = 1;
+		//This section takes 3.76us or 376ns per hit.  That's 6x 160 MHz clock ticks.
 		temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;
 		temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;
 		temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;
@@ -91,8 +130,59 @@ void app_main(void)
 		temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;
 		temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;
 		temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;temp = *readval;
-#endif
+		*odr = 0;
+		*odr = 1;
+		//This section takes 5.052us or 505.2ns per hit.  That's 8x 160 MHz clock ticks.
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;asm volatile( "nop\n" ); temp = *readval;
+		*odr = 0;
+
+		*odr = 1;
+		//This section ALSO takes 5.052us or 505.2ns per hit.  That's 8x 160 MHz clock ticks.
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\n" ); temp = *readval;
+		*odr = 0;
+
+		*odr = 1;
+		//This section ALSO takes 6.3us or 630ns per hit.  That's 10x 160 MHz clock ticks.
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;asm volatile( "nop\nnop\nnop\n" ); temp = *readval;
+		*odr = 0;
+
+
 		asm volatile( "nop\nnop" );
+		*odr = *readval;
+		asm volatile( "nop\nnop" );
+		*odr = 0;
+		asm volatile( "nop\nnop" );
+		*odr = 1;
+		asm volatile( "nop\nnop" );
+		*odr = 0;
+		asm volatile( "nop\nnop\nnop" );
 		*odr = 1;
 		asm volatile( "nop\nnop\nnop" );
 		*odr = 0;
@@ -117,8 +207,48 @@ void app_main(void)
 		*odr = 0;
 		*odr = 1;
 		*odr = 0;
-       // gpio_set_level(0, 1);
-       // gpio_set_level(0, 0);
+
+		GPIO.out.val = 1<<1;
+
+
+		//Triggers GPIO interrupt on GPIO7 if you solder GPIO6 and GPIO7 together.
+		*odr = (1<<6);
+
+		//Tested:  It takes this many nops sothat 
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+
+		//Interrupt is triggered here.
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+		*odr = 1;
+
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+		asm volatile( "nop\nnop\nnop\nnop" );
+
 	}
 
     for (int i = 10; i >= 0; i--) {

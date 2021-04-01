@@ -1,8 +1,7 @@
 # ESP32C3 Various tests
 
 
-
-## GPIO General observations:
+## GPIO / Interrupt General observations:
 	* Writing out to a port is a quantized operation.
 	* CPU is at 160? MHz.
 	* AHB quantized at 80 MHz.
@@ -14,6 +13,9 @@
 	* It appears using data immediately after read incurs a one 80 MHz cycle penalty.
 	* W1TS and W1TC are the same as OUT.
 	* See gpio_struct.h for the actual structure.
+	* Interrupt servicing takes around 32 cycles (200ns) if you include all GPIO and bus overhead, when using bonded triggers.
+	* Externally, tests have shown rising end to output being around 196 to 272ns (+/- 76ns). (p-p jitter of 12 160 MHz cycles)
+	    * This is with AHB usage but not anything particularly heinous, like running directly from flash.
 
 ## Get an assembly listing of your program.
 
@@ -38,8 +40,22 @@ Find your function in esp32c3.rom.ld and follow it around.
 The I2S engine in the C3 looks to be much more robust than in previous chips.  I still can't get WSCLK working right, but the raw performance with the GDMA engine is spectacular.
 
 
+## Interrupts
+
+Interrupts are stored in `vectors.S` and use a jump table.  All interrupts are funneled through `_interrupt_handler` at this time, there is some unfortunate code in `interrupt_controller_hal.c`'s `is_interrupt_number_reserved(...)` which prevents attaching of interrupts which do not use `_interrupt_handler` within the rest of the system.
+
+WAIT! Maybe this is a OK thing.  That means we might be able to arbitrarily assign interrupts. YES! Yes can.  Time for a PR.
+
+So, figured it out. 
+	(1) Looks like avoiding the `j` in the vector jumptable saves 2 (160 MHz) cycles.
+	(2) That means for an external interrupt, to replying with GPIO back out with the following code, it takes 200ns, or 32 (160 MHz) cycles.
+
+This slowness is unfortunate but understandable.  It also includes the time spent to increment the stack pointer, save off some registers, setup the regisers for GPIO output and output.
 
 
+### TODO Interrupts
+
+Can we weakly tie all of the interrupts to unique handlers then allow users to override if they want?
 
 
 
