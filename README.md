@@ -17,6 +17,13 @@
 	* Externally, tests have shown rising end to output being around 196 to 272ns (+/- 76ns). (p-p jitter of 12 160 MHz cycles)
 	    * This is with AHB usage but not anything particularly heinous, like running directly from flash.
 
+## I2S General observations:
+	* When setting I2S to APLL it automatically operates at 240MHz.  You must /2 for BCK.  But that is, stock, 120 MHz output clock.
+	* APLL Seems tied to BBPLL.  But BBPLL can't overclock too hard.  Part becomes flakey at 220/240 MHz.
+	* I could only get TDM mode working, and only then without a properly formed WS line.  So it's good for fun stuff, not for real TDM.
+
+
+
 ## Get an assembly listing of your program.
 
 Ideally you write some stub function to do what you want to do roughly, then run this, then write your own function to replace it in assembly.
