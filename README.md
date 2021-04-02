@@ -18,7 +18,9 @@
 	    * This is with AHB usage but not anything particularly heinous, like running directly from flash.
 
 ## I2S General observations:
-	* When setting I2S to APLL it automatically operates at 240MHz.  You must /2 for BCK.  But that is, stock, 120 MHz output clock.
+	* When setting I2S to APLL it automatically operates at 240MHz.  You must /2 for BCK.  But that is, stock, 120 Bit/s output clock.
+	* That is capable of outputting 60 MHz carriers.
+	* The main system PLL can be overclocked by 25% to generate a 75 MHz carrier.
 	* APLL Seems tied to BBPLL.  But BBPLL can't overclock too hard.  Part becomes flakey at 220/240 MHz.
 	* I could only get TDM mode working, and only then without a properly formed WS line.  So it's good for fun stuff, not for real TDM.
 
@@ -59,17 +61,7 @@ So, figured it out.
 
 This slowness is unfortunate but understandable.  It also includes the time spent to increment the stack pointer, save off some registers, setup the regisers for GPIO output and output.
 
-
-### TODO Interrupts
-
-Can we weakly tie all of the interrupts to unique handlers then allow users to override if they want?
-
-
-
-
-
-
-
+OKK I have a PR in with espressif.  Using this you can look at an example where we replace the interrupt vector completely (and can have arbitrary code there) in the gpio example in this tree. https://github.com/espressif/esp-idf/pull/6808
 
 
 ## TODO
