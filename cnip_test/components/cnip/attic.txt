@@ -1,0 +1,164 @@
+Various optimized versons
+
+#if 0
+	//Slow, non-optimized code.
+	/*
+		For 1024-byte packets, 5257 cycles. 
+	*/
+	uint16_t i;
+	uint8_t * start =  &hal->outgoing_base[offset];
+	{
+		const uint16_t * wptr = (uint16_t*) start;
+		for (i=1;i<len;i+=2)
+		{
+			csum = csum + (uint32_t)(*(wptr++));	
+		}
+		if( len & 1 )  //See if there's an odd number of bytes?
+		{
+			uint8_t * tt = (uint8_t*)wptr;
+			csum += *tt;
+		}
+	}
+	uint16_t csd16;
+	while( ( csd16 = csum>>16 ) )
+	{
+		csum = (csum & 0xffff) + csd16;
+	}
+	csum = (csum>>8) | ((csum&0xff)<<8);	//Flip endianmess.
+
+#elif 0
+	/*
+		lwip checksum (v1)
+		For 1024-byte packets, 7341 cycles.  Oh wow, it's even worse!
+	*/
+
+	const void *dataptr = &hal->outgoing_base[offset];
+
+  uint32_t acc;
+  uint16_t src;
+  const uint8_t *octetptr;
+
+  acc = 0;
+  /* dataptr may be at odd or even addresses */
+  octetptr = (const uint8_t*)dataptr;
+  while (len > 1) {
+    /* declare first octet as most significant
+       thus assume network order, ignoring host order */
+    src = (*octetptr) << 8;
+    octetptr++;
+    /* declare second octet as least significant */
+    src |= (*octetptr);
+    octetptr++;
+    acc += src;
+    len -= 2;
+  }
+  if (len > 0) {
+    /* accumulate remaining octet */
+    src = (*octetptr) << 8;
+    acc += src;
+  }
+  /* add deferred carry bits */
+  acc = (acc >> 16) + (acc & 0x0000ffffUL);
+  if ((acc & 0xffff0000UL) != 0) {
+    acc = (acc >> 16) + (acc & 0x0000ffffUL);
+  }
+	csum = acc;
+#elif 0
+	/*
+		lwip checksum (v2)
+		For 1024-byte packets, 5264 cycles.  Pretty lame still.
+	*/
+#define FOLD_U32T(u)          (((u) >> 16) + ((u) & 0x0000ffffUL))
+#define SWAP_BYTES_IN_WORD(w) (((w) & 0xff) << 8) | (((w) & 0xff00) >> 8)
+	const void *dataptr = &hal->outgoing_base[offset];
+
+  const uint8_t *pb = (const uint8_t *)dataptr;
+  const uint16_t *ps;
+  uint16_t t = 0;
+  uint32_t sum = 0;
+  int odd = ((uint32_t)pb & 1);
+
+  /* Get aligned to u16_t */
+  if (odd && len > 0) {
+    ((uint8_t *)&t)[1] = *pb++;
+    len--;
+  }
+
+  /* Add the bulk of the data */
+  ps = (const uint16_t *)(const void *)pb;
+  while (len > 1) {
+    sum += *ps++;
+    len -= 2;
+  }
+
+  /* Consume left-over byte, if any */
+  if (len > 0) {
+    ((uint8_t *)&t)[0] = *(const uint8_t *)ps;
+  }
+
+  /* Add end bytes */
+  sum += t;
+
+  /* Fold 32-bit sum to 16 bits
+     calling this twice is probably faster than if statements... */
+  sum = FOLD_U32T(sum);
+  sum = FOLD_U32T(sum);
+
+  /* Swap if alignment was odd */
+  if (odd) {
+    sum = SWAP_BYTES_IN_WORD(sum);
+  }
+
+	csum = sum;
+	csum = (csum>>8) | ((csum&0xff)<<8);	//Flip endianmess.
+
+#else
+	//Xtensa-optimized checksum
+	/*
+		For 1024-byte packets 3430 cycles. ~1.5x faster.
+	*/
+	uint32_t * val = (uint32_t*)&hal->outgoing_base[offset];
+
+	int odd = 0;
+	//Non-16-bit-aligned checksums are NOT supported.
+	if( len && ((uint32_t)val) & 1 )
+	{
+		odd = 1;
+		csum = *((uint8_t*)val);
+		val = (uint32_t*)(((uint8_t*)val)+1);
+		len--;
+	}
+
+	//Make sure it's aligned.
+	if( ((uint32_t)val) & 2 )
+	{
+		csum = *(uint16_t*)val;
+		val = (uint32_t*)&hal->outgoing_base[offset+2];
+		len -= 2;
+	}
+	for( ; len > 3 ; len-=4 )
+	{
+		uint32_t csv = *val;
+		val ++;
+		csum += csv & 0xffff;
+		csum += csv >> 16;
+	}
+	if( len & 2 )	//Handle a possible 2-byte trailer
+	{
+		csum += *((uint16_t*)val);
+		val = (uint32_t*)(((uint8_t*)val)+2);
+	}
+	if( len & 1 )
+	{
+		csum += *(uint8_t*)val;
+	}
+
+	uint16_t csd16;
+	while( ( csd16 = csum>>16 ) )
+	{
+		csum = (csum & 0xffff) + csd16;
+	}
+
+	//If odd, need to flip bits... but we're already flipping once.
+	if (!odd) csum = (csum>>8) | ((csum&0xff)<<8);	//Flip endianmess.
+
