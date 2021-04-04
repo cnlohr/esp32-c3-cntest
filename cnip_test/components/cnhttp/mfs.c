@@ -10,6 +10,8 @@
 
 #include <string.h>
 
+static const char *TAG = "MFS";
+
 #ifdef USE_RAM_MFS
 
 uint8_t * mfs_data;
@@ -32,7 +34,7 @@ int8_t MFSOpenFile( const char * fname, struct MFSFileInfo * mfi )
 	struct MFSFileEntry e;
 
 	uint8_t * ptr = mfs_data;
-	printf( "%p: %02x %02x %02x %02x\n", mfs_data, mfs_data[0], mfs_data[1], mfs_data[2], mfs_data[3] );
+
 	while(1)
 	{
 		//spi_flash_read( ptr, (uint32*)&e, sizeof( e ) );		
@@ -73,6 +75,31 @@ void MFSClose( struct MFSFileInfo * mfi )
 
 #else
 
+#include <esp_partition.h>
+#include <wear_levelling.h>
+#include <esp_vfs_fat.h>
+#include <diskio_wl.h>
+
+wl_handle_t fatfs_partition_handle;
+FATFS * fatfs_handle;
+
+void MFSInit()
+{
+
+	const esp_vfs_fat_mount_config_t mcfg = { 
+		.format_if_mount_failed = 1,
+		.max_files = 7,
+		.allocation_unit_size = CONFIG_WL_SECTOR_SIZE,
+	};
+	esp_err_t err = esp_vfs_fat_spiflash_mount( "/fatfs", "fatfs", &mcfg, &fatfs_partition_handle );
+	if( err )
+	{
+		ESP_LOGE( TAG, "esp_vfs_fat_spiflash_mount(...) = %d\n", err );
+		return;
+	}
+	ESP_LOGI( TAG, "FatFS Mounted\n" );
+}
+
 
 //Returns 0 on succses.
 //Returns size of file if non-empty
@@ -82,20 +109,23 @@ int8_t MFSOpenFile( const char * fname, struct MFSFileInfo * mfi )
 {
 	char targfile[1024];
 
+	if( mfi->file )
+	{
+		ESP_LOGE( TAG, "File dobule-opened on mfi %p\n", mfi );
+	}
 	if( strlen( fname ) == 0 || fname[strlen(fname)-1] == '/' )
 	{
-		snprintf( targfile, sizeof( targfile ) - 1, "page/%s/index.html", fname );
+		snprintf( targfile, sizeof( targfile ) - 1, "/fatfs/%s/index.html", fname );
 	}
 	else
 	{
-		snprintf( targfile, sizeof( targfile ) - 1, "page/%s", fname );
+		snprintf( targfile, sizeof( targfile ) - 1, "/fatfs/%s", fname );
 	}
 
-	printf( ":%s:\n", targfile );
-
+	//printf( ":%s:%p\n", targfile, mfi );
 	FILE * f = mfi->file = fopen( targfile, "rb" );
-	if( f <= 0 ) return -1;
-	printf( "F: %p\n", f );
+	if( !f ) return -1;
+	//printf( "F: %p\n", f );
 	fseek( f, 0, SEEK_END );
 	mfi->filelen = ftell( f );
 	fseek( f, 0, SEEK_SET );
@@ -116,7 +146,12 @@ int32_t MFSReadSector( uint8_t* data, struct MFSFileInfo * mfi )
 
 void MFSClose( struct MFSFileInfo * mfi )
 {
-	if( mfi->file ) fclose( mfi->file );
+	//printf( "===== CLOSE MFI %p\n", mfi );
+	if( mfi->file )
+	{
+		fclose( mfi->file );
+		mfi->file = 0;
+	}
 }
 
 

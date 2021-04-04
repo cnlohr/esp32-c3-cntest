@@ -1,5 +1,5 @@
 .PHONY : all clean push
-all : mfsmaker page.mfs burn
+all : mfsmaker page.mfs tftppush
 
 CC = gcc
 CFLAGS = $(OPTS)
@@ -31,8 +31,24 @@ page.mfs : mfsmaker $(wildcard page/*) component.mk
 	) true
 	./mfsmaker tmp page.mfs
 
-flash : page.mfs
-	esptool.py  write_flash -z 0x110000 page.mfs
+#flash : page.mfs
+#	esptool.py  write_flash -z 0x110000 page.mfs
+
+page.fat : $(wildcard page/*)
+	mkdir -p mount
+	dd if=/dev/zero of=page.fat bs=983040 count=1
+	mkfs.vfat page.fat
+	sudo mount -o loop page.fat mount
+	sudo cp -r page mount/
+	sudo umount page.fat
+
+
+tftppush :
+	tftp esp82xx.local < pushscript.txt
+
+
+flash : page.fat
+	esptool.py  write_flash -z 0x110000 page.fat
 
 clean :
-	$(RM) mfsmaker page.mfs tmp/*
+	$(RM) -rf mfsmaker page.mfs page.fat tmp/*

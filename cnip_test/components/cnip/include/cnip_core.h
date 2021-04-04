@@ -101,12 +101,13 @@ void cnip_switch_to_broadcast( cnip_ctx * ctx );
 void cnip_send_etherlink_header( cnip_ctx * ctx, unsigned short type );
 void cnip_send_ip_header( cnip_ctx * ctx, unsigned short totallen, uint32_t to_ip, unsigned char proto );
 void cnip_finish_udp_packet( cnip_ctx * ctx );
+void cnip_util_emit_udp_packet( cnip_ctx * ctx, uint8_t * payload, uint32_t payloadlength, uint32_t dstip, uint16_t srcport, uint16_t dstport );
 
 #ifdef INCLUDE_TCP
 void cnip_handle_tcp( cnip_ctx * ctx, uint16_t iptotallen );
 #endif
 
-//YOU HAVE TO WRITE THIS!!!
+//Applications must write this.
 void cnip_handle_udp( cnip_ctx * ctx, uint16_t len );
 
 #ifdef ARP_CLIENT_SUPPORT

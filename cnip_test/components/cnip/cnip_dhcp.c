@@ -323,7 +323,7 @@ void cnip_tick_dhcp( cnip_ctx * ctx )
 
 
 #if defined( ENABLE_DHCP_CLIENT )
-//Mode = 1 for discover, Mode = 3 for request - if discover, dhcp_server should be 0.
+//Mode = 1 for discover, Mode = 3 for request - if discover, dhcp_server should be 0. 
 void cnip_dhcp_send_request( cnip_ctx * ctx, uint8_t mode, cnip_addy negotiating_ip, cnip_addy server, cnip_addy dest_addy, uint8_t * transaction_id )
 {
 	cnip_dhcpc * dc = ctx->dhcpc;
@@ -386,7 +386,12 @@ void cnip_dhcp_send_request( cnip_ctx * ctx, uint8_t mode, cnip_addy negotiating
 		cnip_hal_push16( hal, 67 );  //To bootps
 		cnip_hal_push16( hal, 68 );  //From bootpc
 	}
-	cnip_hal_pushpgmblob( hal, (void*)PSTR("\x00\x00\x00\x00\x02\x01\x06"), 8 ); //NOTE: Last digit is 0 on wire, not included in string.
+	
+	cnip_hal_push32LE( hal, 0 );
+	int messagetype = mode;
+	if( messagetype == 3 ) messagetype = 1;
+	cnip_hal_push32LE( hal, messagetype | 0x00060100 );
+//	cnip_hal_pushpgmblob( hal, (void*)PSTR("\x00\x00\x00\x00\x02\x01\x06"), 8 ); //NOTE: Last digit is 0 on wire, not included in string.
 
 	cnip_hal_pushblob( hal, transaction_id, 4 );
 

@@ -15,8 +15,11 @@
 #define ENABLE_DHCP_SERVER
 #define DHCP_SERVER_LEASE_TIME_SECONDS 86400
 #define DHCP_SERVER_MAX_CLIENTS ESP_WIFI_MAX_CONN_NUM
+#define ENABLE_CNIP_TFTP_SERVER
 
 #define CNIP_LITTLE_ENDIAN
+
+#define CNIP_MDNS
 
 #define INCLUDE_UDP
 #define PSTR(x) x //This system does not have special rules for flash access.

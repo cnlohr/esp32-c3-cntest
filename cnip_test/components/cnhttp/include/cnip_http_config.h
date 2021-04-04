@@ -3,7 +3,11 @@
 
 #define ICACHE_FLASH_ATTR
 #define HTTP_IRAM CNIP_IRAM
-#define USE_RAM_MFS
+
+
+//Uncomment if you want a real MFS partition.
+//Otherwise it mounts a FatFS partition at 0x11000
+//#define USE_RAM_MFS
 
 #include <cnip_hal.h>
 #include "cnip_sha1.h"

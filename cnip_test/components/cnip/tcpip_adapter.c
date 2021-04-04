@@ -1,7 +1,14 @@
+////////////////////////////////////////////////////////////////////////////////
+// THIS FILE WILL SOON BE DEPRECATED ///////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+
 #include <tcpip_adapter.h>
 #include <cnip_hal.h>
 #include <cnip_core.h>
 #include <cnip_dhcp.h>
+#include <cnip_mdns.h>
+
 //#include <esp_eth.h>
 //#include <esp_wifi_internal.h>
 #include <esp_private/wifi.h>
@@ -9,6 +16,10 @@
 #include <esp_log.h>
 #include <esp_netif.h>
 #include <esp_wifi_netif.h>
+
+#if defined(ENABLE_CNIP_TFTP_SERVER)
+#include "cnip_tftp.h"
+#endif
 
 volatile uint32_t  packet_stopwatch;
 //static esp_eth_handle_t s_eth_handle = NULL;
@@ -62,6 +73,16 @@ void cnip_task( void * pvParameters )
 					cnip_tick_dhcp( hal->ip_ctx );
 					cnip_user_timed_tick( &haldevs[i], 1 );
 					cnip_tcp_tick( hal->ip_ctx );
+
+
+#if defined(ENABLE_CNIP_TFTP_SERVER)
+					TickCNIP_TFTP();
+#endif
+
+#ifdef CNIP_MDNS
+					cnip_mdns_tick( hal->ip_ctx );
+#endif
+
 #if 0
 					printf( "T:" );
 					int j;
@@ -182,9 +203,17 @@ int8_t CNIP_IRAM cnip_hal_xmitpacket( cnip_hal * hal, cnip_mem_address start, ui
 
 void cnip_got_dhcp_lease_cb( cnip_ctx * ctx )
 {
-	printf( "Got Lease!!\n" );
+	//Got IP!
 	uint8_t * ip = (uint8_t*)&ctx->ip_addr;
 	printf( "IP: %d.%d.%d.%d  %08x\n", ip[0], ip[1], ip[2], ip[3], ctx->ip_addr );
+
+	//Code elsewhere relies on the ORDERING of these three!
+	system_event_t event = { 0 };
+	event.event_id = SYSTEM_EVENT_STA_GOT_IP;
+	event.event_info.got_ip.ip_info.ip.addr      = ctx->ip_addr;
+	event.event_info.got_ip.ip_info.netmask.addr = ctx->ip_mask;
+	event.event_info.got_ip.ip_info.gw.addr      = ctx->ip_gateway;
+	esp_event_send(&event);
 }
 
 static void tcpip_adapter_action_sta_connected(void *arg, esp_event_base_t base, int32_t event_id, void *data)

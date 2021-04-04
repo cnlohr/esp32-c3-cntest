@@ -41,13 +41,6 @@ void CNIP_IRAM cnip_user_timed_tick( cnip_hal * hal, int is_slow )
 #endif
 }
 
-
-void CNIP_IRAM cnip_handle_udp( cnip_ctx * ctx, uint16_t len )
-{
-	//printf( "Got UDP packet!\n" );
-	//If we want to do anything with UDP
-}
-
 uint8_t CNIP_IRAM cnip_tcp_recv_syn_cb( struct cnip_ctx_t * ctx, uint16_t portno )
 {
 	if( portno == 80 )

@@ -34,7 +34,6 @@ void HTTPClose( int state_to_go_to )
 	//socket is successfully closed.
 	//curhttp->state = HTTP_STATE_NONE;
 	curhttp->state = state_to_go_to;
-	printf( "HTTPClose( %d )\n", state_to_go_to );
 	et_espconn_disconnect( curhttp->socket ); 
 	CloseEvent();
 }
@@ -271,7 +270,10 @@ void CNIP_IRAM HTTPHandleInternalCallback( )
 	EndTCPWrite( curhttp->socket );
 
 	if( !curhttp->bytesleft )
+	{
+		if( !curhttp->is_dynamic ) MFSClose( &curhttp->data.filedescriptor );
 		curhttp->isdone = 1;
+	}
 }
 
 void CNIP_IRAM InternalStartHTTP( )

@@ -4,6 +4,6 @@ idf_component_register(SRCS "cnip_http.c"
                             "mfs.c"
                             "networking.c"
                     INCLUDE_DIRS "include"
-                    REQUIRES esp_wifi cnip spi_flash
+                    REQUIRES esp_wifi cnip spi_flash fatfs vfs wear_levelling
                     PRIV_REQUIRES esptool_py)
 

@@ -62,7 +62,7 @@ int8_t CNIP_IRAM cnip_hal_init( cnip_hal * hal, const unsigned char * macaddy );
 #define cnip_hal_finish_callback_now(hal)
 
 //Raw, on-wire pops. (assuming already in read)
-void CNIP_IRAM cnip_hal_popblob( cnip_hal * hal, uint8_t * data, uint8_t len );
+void CNIP_IRAM cnip_hal_popblob( cnip_hal * hal, uint8_t * data, uint16_t len );
 inline void CNIP_IRAM cnip_hal_dumpbytes( cnip_hal * hal, uint8_t len ) { hal->incoming_cur += len; }
 
 inline cnip_mem_address CNIP_IRAM cnip_hal_get_scratchpad( cnip_hal * hal ) { return hal->scratchpad; } 
@@ -73,6 +73,10 @@ uint32_t CNIP_IRAM cnip_hal_pop32LE( cnip_hal * hal );
 uint8_t CNIP_IRAM cnip_hal_pop8( cnip_hal * hal );
 
 uint8_t * CNIP_IRAM cnip_hal_pop_ptr_and_advance( cnip_hal * hal, int size_to_pop );
+
+//Returns a null terminated string, even if there isn't enough room it forces the null termination.
+//Also returns length of string.
+int cnip_hal_popstr( cnip_hal * hal, char * data, uint8_t maxlen );
 
 
 //Raw, on-wire push. (assuming already in write)

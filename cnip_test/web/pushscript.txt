@@ -1,0 +1,5 @@
+put tmp/example.js /fatfs/example.js
+put tmp/index.html /fatfs/index.html
+put tmp/menuinterface.js /fatfs/menuinterface.js
+put tmp/jquery-2.1.4.min.js.gz /fatfs/jquery-2.1.4.min.js.gz
+

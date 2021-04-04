@@ -21,9 +21,17 @@
 #include <cnip_tcp.h>
 #endif
 
+#ifdef CNIP_MDNS
+#include <cnip_mdns.h>
+#endif
 
 #if defined( ENABLE_DHCP_CLIENT ) || defined( ENABLE_DHCP_SERVER ) 
 #include <cnip_dhcp.h>
+#endif
+
+
+#if defined( ENABLE_CNIP_TFTP_SERVER ) 
+#include <cnip_tftp.h>
 #endif
 
 
@@ -254,6 +262,12 @@ static void HandleArp( cnip_ctx * ctx )
 	}
 }
 
+
+
+void CNIP_IRAM __attribute__((weak)) cnip_handle_udp( cnip_ctx * ctx, uint16_t len )
+{
+}
+
 void CNIP_IRAM cnip_hal_receivecallback( cnip_hal * hal )
 {
 	cnip_ctx * ctx = hal->ip_ctx;
@@ -337,6 +351,12 @@ void CNIP_IRAM cnip_hal_receivecallback( cnip_hal * hal )
 			return;
 		}
 #endif
+#ifdef CNIP_MDNS
+		if( ctx->localport == 5353 )
+		{
+			got_mdns_packet(ctx, POP16 );
+		}
+#endif
 	}
 
 	if( !is_the_packet_for_me )
@@ -358,8 +378,20 @@ void CNIP_IRAM cnip_hal_receivecallback( cnip_hal * hal )
 #ifdef INCLUDE_UDP
 	case 17:
 	{
-		//err is this dangerous?
-		cnip_handle_udp( ctx, POP16 );
+		uint16_t length = POP16 - 8; //Minus the UDP header.
+		POP16; //Checksum (assume lower layers have handled it)
+		printf( "UDP PORT: %d %d // %d\n", ctx->remoteport, ctx->localport, length );
+
+		#if defined( ENABLE_CNIP_TFTP_SERVER ) 
+		if( ctx->localport == 69 || ( ctx->localport >= TFTP_LOCAL_BASE_PORT && ctx->localport < TFTP_LOCAL_BASE_PORT+MAX_TFTP_CONNECTIONS ) )
+		{
+			HandleCNIPTFTPUDPPacket( ctx, length );
+		}
+		else
+		#endif
+		{
+			cnip_handle_udp( ctx, length );
+		}
 		break;	
 	}
 #endif
@@ -382,14 +414,16 @@ void CNIP_IRAM cnip_hal_receivecallback( cnip_hal * hal )
 
 #ifdef INCLUDE_UDP
 
+#define CNIP_ADD_MAC 0
 void cnip_finish_udp_packet( cnip_ctx * ctx )// unsigned short length )
 {
 	cnip_hal * hal = ctx->hal;
 
 	//Packet loaded.
 	cnip_hal_stopop( hal );
+	#define CNIPSUBMAC (-6*CNIP_ADD_MAC)
 
-	unsigned short length = cnip_hal_get_write_length( hal ) - 6; //6 = my mac
+	unsigned short length = cnip_hal_get_write_length( hal ) - CNIPSUBMAC; //6 = my mac
 	//Write length in packet
 	cnip_hal_alter_word( hal, 10+6, length-14 ); //Experimentally determined 14, 0 was used for a long time.
 #ifndef HARDWARE_HANDLES_IP_CHECKSUM
@@ -409,6 +443,25 @@ void cnip_finish_udp_packet( cnip_ctx * ctx )// unsigned short length )
 	cnip_hal_endsend( hal );
 }
 
+
+void cnip_util_emit_udp_packet( cnip_ctx * ctx, uint8_t * payload, uint32_t payloadlength, uint32_t dstip, uint16_t srcport, uint16_t dstport )
+{
+	// Truncate packet
+	if( payloadlength > CNIP_HAL_SCRATCHPAD_TX_SIZE - 40 )
+	{
+		payloadlength = CNIP_HAL_SCRATCHPAD_TX_SIZE - 40;
+	}
+	cnip_hal * hal = ctx->hal;
+	cnip_hal_stopop( hal );
+	cnip_hal_startsend( hal, cnip_hal_get_scratchpad( hal ), CNIP_HAL_SCRATCHPAD_TX_SIZE ); 
+	cnip_send_etherlink_header( ctx, 0x0800 );
+	cnip_send_ip_header( ctx, 0 /* Will get filled in */, dstip, 17 );
+	cnip_hal_push16( hal, srcport );
+	cnip_hal_push16( hal, dstport );
+	cnip_hal_push32LE( hal, 0 ); //Will be length and checksum
+	cnip_hal_pushblob( hal, payload, payloadlength );
+	cnip_finish_udp_packet( ctx );
+}
 
 #endif
 

@@ -54,10 +54,42 @@ uint8_t * CNIP_IRAM cnip_hal_push_ptr_and_advance( cnip_hal * hal, int size_to_p
 	return ret;
 }
 
+int cnip_hal_popstr( cnip_hal * hal, char * data, uint8_t maxlen )
+{
+	int readleft = hal->incoming_end - hal->incoming_cur;
+	int i;
+	int maxtoread = (readleft < maxlen)?readleft:maxlen;
+	for( i = 0; i < maxtoread; i++ )
+	{
+		char c = data[i] = hal->incoming_cur[i];
+		if( !c ) { hal->incoming_cur += i+1; return i; }
+	}
+	if( i == maxlen )
+	{
+		for( ; i < readleft; i++ )
+		{
+			if( hal->incoming_cur[i] == 0)
+			{
+				hal->incoming_cur += i+1;
+				return -1;
+			}
+		}
+	}
+
+	if( i != maxlen )
+	{
+		//Eh we ran out of data, but we still have room in the buffer.  That's probably fine.
+		data[i] = 0;
+		return i;
+	}
+
+	// Ran out of len and did not find a 0.
+	return -2;
+}
 
 
 //Raw, on-wire pops. (assuming already in read)
-void CNIP_IRAM cnip_hal_popblob( cnip_hal * hal, uint8_t * data, uint8_t len )
+void CNIP_IRAM cnip_hal_popblob( cnip_hal * hal, uint8_t * data, uint16_t len )
 {
 	int readleft = hal->incoming_end - hal->incoming_cur;
 	if( readleft < len ) len = readleft;

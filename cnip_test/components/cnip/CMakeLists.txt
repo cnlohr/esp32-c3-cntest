@@ -2,6 +2,8 @@ idf_component_register(SRCS "cnip_core.c"
                             "cnip_dhcp.c"
                             "cnip_hal.c"
                             "cnip_tcp.c"
+							"cnip_mdns.c"
+							"cnip_tftp.c"
                             "tcpip_adapter.c"
                     INCLUDE_DIRS "include"
                     REQUIRES esp_wifi
