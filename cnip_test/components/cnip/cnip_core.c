@@ -380,7 +380,7 @@ void CNIP_IRAM cnip_hal_receivecallback( cnip_hal * hal )
 	{
 		uint16_t length = POP16 - 8; //Minus the UDP header.
 		POP16; //Checksum (assume lower layers have handled it)
-		printf( "UDP PORT: %d %d // %d\n", ctx->remoteport, ctx->localport, length );
+		//printf( "UDP PORT: %d %d // %d\n", ctx->remoteport, ctx->localport, length );
 
 		#if defined( ENABLE_CNIP_TFTP_SERVER ) 
 		if( ctx->localport == 69 || ( ctx->localport >= TFTP_LOCAL_BASE_PORT && ctx->localport < TFTP_LOCAL_BASE_PORT+MAX_TFTP_CONNECTIONS ) )
